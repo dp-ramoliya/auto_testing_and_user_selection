@@ -24,7 +24,7 @@ def feature_select_GB(X, y):
 
 def feature_select_regression(X, y):
 
-    num_features_to_select = 6  
+    num_features_to_select = 7  
     selector = SelectKBest(score_func=f_regression, k=num_features_to_select)
     X_selected = selector.fit_transform(X, y)
     selected_indices = selector.get_support(indices=True)
@@ -36,5 +36,14 @@ def feature_select_regression(X, y):
 
     sorted_feature_scores = sorted(feature_scores_dict.items(), key=lambda x: x[1], reverse=True)
 
+    feature_l = []
     for feature, score in sorted_feature_scores:
-        print(f"{feature}: {score}")
+        if feature in selected_features:
+            print(f"{feature}: {score}")
+            feature_l.append(feature)
+    print("feature list: ", feature_l)
+    # user_sensor_list = ast.literal_eval(input("Enter sensor list From above list:"))
+    user_sensor_index = input("Enter sensor index From above list to select Feature :")
+    user_sensor_index_list = [int(i) for i in user_sensor_index]
+    user_sensor_list = [feature_l[i] for i in user_sensor_index_list]
+    return user_sensor_list
