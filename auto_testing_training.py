@@ -21,7 +21,7 @@ from sklearn.feature_selection import SelectPercentile, f_regression
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
 
 from utills import db_to_pandas, input_df_wear, msumt_item_relation_table, model_pid_relation, calc_rate
-from feature_select import feature_select_GB
+from feature_select import feature_select_GB, feature_select_regression
 
 warnings.filterwarnings("ignore")
 np.set_printoptions(precision=3, suppress=True)
@@ -115,13 +115,13 @@ mld_pipeline_4 = make_pipeline(
         KNeighborsRegressor(n_neighbors=43, p=2, weights="uniform")
     )
 mld_pipeline_5 = make_pipeline(
-    SelectFromModel(estimator=ExtraTreesRegressor(max_features=0.8, n_estimators=100), threshold=0.5),
+    SelectFromModel(estimator=ExtraTreesRegressor(max_features=0.8, n_estimators=100), threshold=0.1),
     PolynomialFeatures(degree=2, include_bias=False, interaction_only=False),
     StackingEstimator(estimator=DecisionTreeRegressor(max_depth=9, min_samples_leaf=1, min_samples_split=8)),
     RandomForestRegressor(bootstrap=True, max_features=1.0, min_samples_leaf=18, min_samples_split=12, n_estimators=100)
 )
 mld_pipeline_6 = make_pipeline(
-    SelectFromModel(estimator=ExtraTreesRegressor(max_features=0.55, n_estimators=100), threshold=0.40),
+    SelectFromModel(estimator=ExtraTreesRegressor(max_features=0.55, n_estimators=100), threshold=0.3),
     KNeighborsRegressor(n_neighbors=42, p=1, weights="uniform")
 )
 mld_pipeline_7 = make_pipeline(
@@ -178,11 +178,13 @@ for m in all_asset_id:
         # Splitting the dataset into the Training set and Test set
         X_temp = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
-        x_column = feature_select_GB(X_temp, y)
+        #x_column = feature_select_GB(X_temp, y)
+        x_column = feature_select_regression(X_temp, y)
         
         X = sensor_data_with_wear[x_column]
+        print(X)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1)
-
+        
         mlr_loop = model_pipe_dict[r].fit(X_train, y_train)
 
         y_pred= mlr_loop.predict(X_test)
