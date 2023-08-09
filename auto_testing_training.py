@@ -46,7 +46,7 @@ def all_asset_pid(asset_ids, conn):
     return df_asset_pids
 
 conn = psycopg2.connect(
-   database="prod_regression", user='postgres', password='root', host='127.0.0.1', port= '5432'
+   database="regression", user='postgres', password='root', host='127.0.0.1', port= '5432'
 )
 
 # data unit value come from step function
@@ -178,7 +178,7 @@ for m in all_asset_id:
         # Splitting the dataset into the Training set and Test set
         X_temp = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
-        x_column = feature_select_GB(X_temp, y, sensor_data_with_wear.columns)
+        x_column = feature_select_GB(X_temp, y)
         
         X = sensor_data_with_wear[x_column]
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1)
