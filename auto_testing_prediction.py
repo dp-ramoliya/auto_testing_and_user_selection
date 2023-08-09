@@ -16,7 +16,7 @@ np.set_printoptions(precision=3, suppress=True)
 warnings.filterwarnings("ignore")
 
 conn = psycopg2.connect(
-   database="prod_regression", user='postgres', password='root', host='127.0.0.1', port= '5432'
+   database="regression", user='postgres', password='root', host='127.0.0.1', port= '5432'
 )
 
 input_json = """{
