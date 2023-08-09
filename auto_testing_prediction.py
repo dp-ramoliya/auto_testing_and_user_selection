@@ -99,7 +99,6 @@ df_wear["end_index"] = df_ai.index.get_indexer(df_wear["date"].values) + 1
 
 df_wear["rate_mill_h"].fillna(value= 0, inplace=True)
 
-df_wear.to_csv(f"df_wear_{asset_id}.csv")
 df_wear_train = df_wear.copy()
 
 df_wear_test = []
@@ -267,8 +266,6 @@ est_current_operation_rate = estimate_operation_rate(data["wear"], supply_test, 
 df_wear_test.loc[:, "Utilization"] = abs(est_current_operation_rate)
 utilization_dict = dict(zip(df_wear_test.measurement_item_id, df_wear_test.Utilization))
 
-df_wear_test.to_csv("df_wear_test.csv")
-
 data_unit = 4
 # df_rmse = pd.read_csv('rmse/{}_master_rmse.csv'.format(data_unit))
 
@@ -318,7 +315,7 @@ def auto_test_df(df_wear):
     return auto_df
 
 automation_master_df = auto_test_df(df_wear=df_wear)
-automation_master_df.to_csv("automation_master_df.csv")
+# automation_master_df.to_csv("automation_master_df.csv")
 pid_id_list = pids
 
 asset_rmse =[]
