@@ -1,3 +1,5 @@
+import os
+import ast
 import json
 import joblib
 import psycopg2
@@ -63,6 +65,7 @@ with pd.option_context("mode.use_inf_as_na", True):
 
 # Fetching pid relation from database to dataframe
 df_pids = all_asset_pid(asset_id, conn)
+pids_and_name = {i:j for i,j in zip(df_pids['t_pid_no_text'].values, df_pids['sensor_name'].values)}
 df_pids.set_index('sensor_name', inplace=True)
 pids = tuple(df_pids['t_pid_no_text'].values)
 
@@ -325,6 +328,10 @@ total_hours_list = []
 remaining_hours_list = []
 threshold_wear_list = []
 
+feature_GB = pd.read_csv("data/features_GB.csv")
+feature_GB = feature_GB[feature_GB['asset_id'] == asset_id]
+feature_GB['features'] = feature_GB['features'].apply(ast.literal_eval)
+
 for r in df_wear.measurement_item_id.unique():
     print("prediction of Longitude: ", colored(str(r), 'red', attrs=['bold']))
     last_date = automation_master_df[automation_master_df["measurement_item_id"]==r].from_pred_date.to_list()[0]
@@ -334,11 +341,9 @@ for r in df_wear.measurement_item_id.unique():
     dict_sensor_dfs.dropna(inplace=True)
     model_loop = joblib.load(open('auto_training/model_{}.pkl'.format(r),'rb'))
     
-    #rate_mill_h = df_wear_test[df_wear_test['measurement_item_id'] ==r].rate_mill_h.values[0]
-    #rate_mill_h = df_wear[df_wear['measurement_item_id'] ==r].rate_mill_h.values[0]
+    # rate_mill_h = df_wear_test[df_wear_test['measurement_item_id'] ==r].rate_mill_h.values[0]
     rate_mill_h = df_wear[df_wear['measurement_item_id'] == r][df_wear['date'] == last_date]['rate_mill_h'].values[0]
     threshold_wear = automation_master_df[automation_master_df["measurement_item_id"]==r].wear_l.to_list()[0][-1]
-    #threshold_wear = 65
     total_wear = automation_master_df[automation_master_df["measurement_item_id"]==r].total_wear.to_list()[0]
     print("threshold_wear :", threshold_wear)
     print("total_wear :", total_wear)
@@ -352,13 +357,29 @@ for r in df_wear.measurement_item_id.unique():
     moisture = dict_sensor_dfs[df_pids.loc['moisture', 't_pid_no_text']].mean()
     air_pressure = dict_sensor_dfs[df_pids.loc['air_pressure', 't_pid_no_text']].mean()
     vibration = dict_sensor_dfs[df_pids.loc['vibration', 't_pid_no_text']].mean()
+
+    sensor_dict = {
+        "supply":supply,
+        "current":current,
+        "HGI":HGI,
+        "moisture":moisture,
+        "air_pressure":air_pressure,
+        "vibration":vibration,
+        "rate_mill_h":rate_mill_h
+    }
+    pids_and_name
+
+    f_value = feature_GB[feature_GB['msumt_id']==r]['features'].explode().tolist()
+    name_change = [pids_and_name[i] if pids_and_name.get(i) else i for i in f_value]
+    name_change = ['rate_mill_h' if 'rate_mill_h' in j else j for j in name_change ]
+    f_list = [sensor_dict[i] if sensor_dict.get(i) else i for i in name_change]
     
-    calc_wear = model_loop.predict([[supply, current, HGI, moisture, air_pressure, vibration, rate_mill_h]])
+    calc_wear = model_loop.predict([f_list])
     calc_wear = calc_wear.reshape(1)
     model_calc_rate = calc_wear[0]
-    print("model_calc_rate ---", model_calc_rate)
+    
     r_days = (threshold_wear-total_wear)/model_calc_rate
-    print("$$$$", r_days)
+    
     if r_days > 2190:
         r_days = 2190
 
@@ -392,16 +413,17 @@ automation_master_df['predicted_date'] = pd.to_datetime(automation_master_df['pr
 automation_master_df['diff_days'] = (automation_master_df['actual_date'] - automation_master_df['predicted_date']).dt.days
 automation_master_df['flag'] = automation_master_df['diff_days'].apply(lambda x: True if -365 <= x <= 1460 else False)
 automation_master_df.drop(['wear_l', 'date_l'], axis=1, inplace=True)
+
 automation_master_df = automation_master_df[['measurement_item_id', 'from_pred_date', 
                                              'total_wear', 'threshold_wear', 'actual_date', 
                                              'predicted_date', 'flag']]
-#'remain_d', 'diff_days'
-print(automation_master_df)
+
 
 true_count = automation_master_df['flag'].sum()
 total_count = len(automation_master_df)
 successful_rate = true_count / total_count * 100  # Calculate the successful rate as a percentage
 
 print(f"Successful Rate of Model: {successful_rate:.2f}%")
-
+if not os.path.exists('./review'):
+    os.mkdir('./review')
 automation_master_df.to_csv(f'review/{asset_id}_auto_predicted_test.csv', index=False)
