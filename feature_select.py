@@ -1,8 +1,17 @@
 import ast
+import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_selection import SelectKBest, f_regression
 
-def feature_select_GB(X, y):
+def feature_select_GB(X, y, asset_id, msumt_id):
+    """
+    Returns the List of Features
+
+    :param X: total features
+    :param y: target 
+    :param asset_id: asset id
+    :param msumt_id: measurement item id (logitude)
+    """
     gb_model = GradientBoostingRegressor()
 
     gb_model.fit(X, y)
@@ -16,7 +25,6 @@ def feature_select_GB(X, y):
         feature_l.append(feature)
 
     print("feature list: ", feature_l)
-    # user_sensor_list = ast.literal_eval(input("Enter sensor list From above list:"))
     user_sensor_index = input("Enter sensor index From above list to select Feature :")
     user_sensor_index_list = [int(i) for i in user_sensor_index]
     user_sensor_list = [feature_l[i] for i in user_sensor_index_list]

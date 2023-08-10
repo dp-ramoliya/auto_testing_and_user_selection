@@ -1,4 +1,4 @@
-import json
+import os
 import joblib
 import warnings
 import psycopg2
@@ -7,20 +7,17 @@ import pandas as pd
 from sklearn import metrics
 from termcolor import colored
 from sklearn.svm import LinearSVR
-from datetime import timedelta, datetime
 from tpot.builtins import StackingEstimator
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.model_selection import GridSearchCV
-from tpot.export_utils import set_param_recursive
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.feature_selection import SelectFromModel
-from sklearn.pipeline import make_pipeline, make_union
+from sklearn.pipeline import make_pipeline
 from sklearn.feature_selection import SelectPercentile, f_regression
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, ExtraTreesRegressor
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 
-from utills import db_to_pandas, input_df_wear, msumt_item_relation_table, model_pid_relation, calc_rate
+from utills import db_to_pandas, input_df_wear, calc_rate
 from feature_select import feature_select_GB, feature_select_regression
 
 warnings.filterwarnings("ignore")
@@ -143,6 +140,8 @@ item_id_relation = "SELECT * FROM t_measurement_item_id_relation"
 mdf = pd.read_sql_query(item_id_relation, conn)
 mdf = mdf[mdf['unit'] == data_unit]
 
+df_feature_GB = pd.DataFrame(columns=['asset_id', 'msumt_id', 'features'])
+
 """Generating Pickle file for All Asset ID"""
 
 for m in all_asset_id:
@@ -178,8 +177,8 @@ for m in all_asset_id:
         # Splitting the dataset into the Training set and Test set
         X_temp = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
-        #x_column = feature_select_GB(X_temp, y)
-        x_column = feature_select_regression(X_temp, y)
+        x_column = feature_select_GB(X_temp, y, asset_id=m, msumt_id=r)
+        df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column] 
         
         X = sensor_data_with_wear[x_column]
         print(X)
@@ -192,6 +191,13 @@ for m in all_asset_id:
         model_prediction.append(sum(y_pred))
         rootMeanSqErr = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
         model_rmse.append(rootMeanSqErr)
+        
+        if not os.path.exists('./auto_training'):
+            os.mkdir('./auto_training')
         joblib.dump(mlr_loop, 'auto_training/model_{}.pkl'.format(r))
 
         print('rootMeanSqErr_of_{}_{} : {}'.format(data_unit, r, rootMeanSqErr))
+
+if not os.path.exists('./data'):
+    os.mkdir('./data')
+df_feature_GB.to_csv("data/features_GB.csv", index=False)

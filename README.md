@@ -1,2 +1,2 @@
-# auto_testing_and_user_selection
+# Auto Testing and User Selection
 This Repository is for Auto Testing and User Selection Feature for POC.
