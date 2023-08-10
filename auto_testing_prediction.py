@@ -12,7 +12,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from utills import get_threshold_value, input_df_wear, getCurrentSensorCount,df_wear_cleaning, \
                    calc_rate, all_asset_pid, db_to_pandas, scale_mill, scale_mill_state, supply_current_convert, \
-                   estimate_operation_rate, sim_days_calculate
+                   estimate_operation_rate, sim_days_calculate, auto_test_df
 np.set_printoptions(precision=3, suppress=True)
 warnings.filterwarnings("ignore")
 
@@ -271,52 +271,7 @@ utilization_dict = dict(zip(df_wear_test.measurement_item_id, df_wear_test.Utili
 data_unit = 4
 # df_rmse = pd.read_csv('rmse/{}_master_rmse.csv'.format(data_unit))
 
-def find_closest(lst, k):
-    lst.sort()
-    closest = lst[0]
-    for num in lst:
-        if abs(num - k) < abs(closest - k):
-            closest = num
-        if num > k:
-            break
-    return closest
-
-def find_wear(lst_d, lst_w, p_date):
-    for i,j in zip(lst_d, lst_w):
-        if i == p_date:
-            return j
-
-def auto_test_df(df_wear):
-    auto_df = pd.DataFrame(columns=['measurement_item_id', 'date_l', 'wear_l'])
-    msumt_id = []
-    date_l = []
-    wear_l = []
-    rate_mill_h = []
-
-    for i,j in df_wear.groupby('measurement_item_id'):
-        j['date'] = j['date'].dt.strftime('%Y-%m-%d')
-        date_of_replace = j[j['wear']==0].date.values
-        filtered_df = j[(j['date'] > date_of_replace[-2]) & (j['date'] < date_of_replace[-1])]
-        print(i, filtered_df.date.values)
-        msumt_id.append(i)
-        date_l.append(filtered_df.date.to_list())
-        wear_l.append(filtered_df.wear.to_list())
-        # rate_mill_h.append(filtered_df.wear.to_list())
-
-    auto_df['measurement_item_id'] = msumt_id
-    auto_df['date_l'] = date_l
-    auto_df['wear_l'] = wear_l
-    # auto_df['rate_mill_h'] = rate_mill_h
-
-    auto_df['date_l'] = auto_df.apply(lambda x: [datetime.strptime(i, '%Y-%m-%d') for i in x['date_l']], axis=1)
-    auto_df['start_date'] = auto_df.apply(lambda x: x['date_l'][0] + timedelta(days=365*3), axis=1)
-    auto_df['from_pred_date'] = auto_df.apply(lambda x: find_closest(x['date_l'] , x['start_date']), axis=1)
-    auto_df['total_wear'] = auto_df.apply(lambda x: find_wear(x['date_l'] ,x['wear_l'], x['from_pred_date']), axis=1)
-    auto_df.drop(['start_date'], axis=1, inplace=True)
-
-    return auto_df
-
-automation_df = auto_test_df(df_wear=df_wear)
+automation_df = auto_test_df(df_wear=df_wear, YEAR=3)
 # automation_master_df.to_csv("automation_master_df.csv")
 pid_id_list = pids
 
@@ -325,8 +280,8 @@ actual_date = []
 rm_days_sim = []
 rm_days_test = []
 total_hours_list = []
-remaining_hours_list = []
 threshold_wear_list = []
+remaining_hours_list = []
 
 feature_GB = pd.read_csv("data/features_GB.csv")
 feature_GB = feature_GB[feature_GB['asset_id'] == asset_id]
@@ -411,6 +366,7 @@ for r in np.arange(0.1, 1.1, 0.1):
 automation_df_sim = pd.concat(automation_df_sim, axis=0)
 
 automation_df['remain_d'] = rm_days_test
+automation_df['Utilization'] = est_current_operation_rate
 automation_df['threshold_wear'] = threshold_wear_list
 automation_df["actual_date"] = actual_date
 automation_df.loc[:, "predicted_date"] = pd.to_datetime(automation_df["from_pred_date"]) + pd.to_timedelta(
@@ -424,8 +380,8 @@ automation_df['flag'] = automation_df['diff_days'].apply(lambda x: True if -365 
 automation_df.drop(['wear_l', 'date_l'], axis=1, inplace=True)
 
 automation_df = automation_df[['measurement_item_id', 'from_pred_date', 
-                                             'total_wear', 'threshold_wear', 'actual_date', 
-                                             'predicted_date', 'flag']]
+                               'total_wear', 'threshold_wear', 'Utilization', 'actual_date', 
+                                'predicted_date', 'flag']]
 automation_df.set_index(['measurement_item_id'], inplace=True)
 
 automation_df_sim.loc[:, "remain_d"] = rm_days_sim
