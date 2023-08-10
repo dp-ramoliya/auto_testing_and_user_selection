@@ -361,11 +361,11 @@ def sim_days_calculate(wear_threshold, total_wear, model_calc_rate, rate_mill_ho
     
     initial_remaining_days = (wear_threshold - total_wear) / model_calc_rate
     
-    if initial_remaining_days > 5475:
-        initial_remaining_days = 5475
+    if initial_remaining_days > 2190:
+        initial_remaining_days = 2190
     
-    if initial_remaining_days < -5475:
-        initial_remaining_days = -5475
+    # if initial_remaining_days < -5475:
+    #     initial_remaining_days = -5475
 
     utilization_rates = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
@@ -390,7 +390,8 @@ def sim_days_calculate(wear_threshold, total_wear, model_calc_rate, rate_mill_ho
        
     for i in range(len(remaining_days)):
         remaining_days[i] = remaining_days[i]-(remaining_days[i]*propotion)
-
+    print("remaining_days: ")
+    print(remaining_days)
     return remaining_days
 
 #For Manual Prediction 
