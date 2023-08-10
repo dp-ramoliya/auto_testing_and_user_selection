@@ -558,3 +558,52 @@ def append_earliest_sim(df):
     df_early = pd.concat(df_early)
 
     return df_early
+
+def find_closest(lst, k):
+    lst.sort()
+    closest = lst[0]
+    for num in lst:
+        if abs(num - k) < abs(closest - k):
+            closest = num
+        if num > k:
+            break
+    return closest
+
+def find_wear(lst_d, lst_w, p_date):
+    for i,j in zip(lst_d, lst_w):
+        if i == p_date:
+            return j
+
+def auto_test_df(df_wear, YEAR):
+    """
+    Returns the dataframe of last date and last wear from last Maintanace and 
+    the actual date that roller changed and wear of that time(Threshold wear).
+
+    :param df_wear: wear value and date from DB.
+    :param YEAR: for selecting last date when Last time roller changed. 
+    """
+    auto_df = pd.DataFrame(columns=['measurement_item_id', 'date_l', 'wear_l'])
+    msumt_id = []
+    date_l = []
+    wear_l = []
+
+    for i,j in df_wear.groupby('measurement_item_id'):
+        j['date'] = j['date'].dt.strftime('%Y-%m-%d')
+        date_of_replace = j[j['wear']==0].date.values
+        filtered_df = j[(j['date'] > date_of_replace[-2]) & (j['date'] < date_of_replace[-1])]
+        print(i, filtered_df.date.values)
+        msumt_id.append(i)
+        date_l.append(filtered_df.date.to_list())
+        wear_l.append(filtered_df.wear.to_list())
+
+    auto_df['measurement_item_id'] = msumt_id
+    auto_df['date_l'] = date_l
+    auto_df['wear_l'] = wear_l
+
+    auto_df['date_l'] = auto_df.apply(lambda x: [datetime.strptime(i, '%Y-%m-%d') for i in x['date_l']], axis=1)
+    auto_df['start_date'] = auto_df.apply(lambda x: x['date_l'][0] + timedelta(days=365*YEAR), axis=1)
+    auto_df['from_pred_date'] = auto_df.apply(lambda x: find_closest(x['date_l'] , x['start_date']), axis=1)
+    auto_df['total_wear'] = auto_df.apply(lambda x: find_wear(x['date_l'] ,x['wear_l'], x['from_pred_date']), axis=1)
+    auto_df.drop(['start_date'], axis=1, inplace=True)
+
+    return auto_df
