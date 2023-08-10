@@ -402,6 +402,14 @@ for r in df_wear.measurement_item_id.unique():
     total_hours_list.append(total_hours)
     remaining_hours_list.append(remaining_hours)
 
+automation_df_sim = []
+for r in np.arange(0.1, 1.1, 0.1):
+    df_append = automation_df.copy()
+    df_append["rate_mill_h"] = r
+    df_append["finite_rate_mill_h"] = 1.0
+    automation_df_sim.append(df_append)
+automation_df_sim = pd.concat(automation_df_sim, axis=0)
+
 automation_df['remain_d'] = rm_days_test
 automation_df['threshold_wear'] = threshold_wear_list
 automation_df["actual_date"] = actual_date
@@ -420,15 +428,15 @@ automation_df = automation_df[['measurement_item_id', 'from_pred_date',
                                              'predicted_date', 'flag']]
 automation_df.set_index(['measurement_item_id'], inplace=True)
 
-df_wear_sim.loc[:, "remain_d"] = rm_days_sim
-df_wear_sim["remain_d"] = df_wear_sim.loc[:, "remain_d"].apply(lambda x: 25000 if x > 25000 else x)
-df_wear_sim.loc[:, "threshold_date"] = pd.to_datetime(df_wear_sim["date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
-    df_wear_sim.loc[:, "remain_d"].values, unit="D")
+automation_df_sim.loc[:, "remain_d"] = rm_days_sim
+automation_df_sim["remain_d"] = automation_df_sim.loc[:, "remain_d"].apply(lambda x: 25000 if x > 25000 else x)
+automation_df_sim.loc[:, "threshold_date"] = pd.to_datetime(automation_df_sim["from_pred_date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
+    automation_df_sim.loc[:, "remain_d"].values, unit="D")
 
-df_wear_sim.loc[:, "threshold_date"] = df_wear_sim.loc[:, "threshold_date"].dt.floor("D")
+automation_df_sim.loc[:, "threshold_date"] = automation_df_sim.loc[:, "threshold_date"].dt.floor("D")
 
-df_wear_sim = df_wear_sim[["measurement_item_id", "rate_mill_h", "threshold_date"]]
-df_sim_out = df_wear_sim.pivot(index='measurement_item_id', columns='rate_mill_h', values='threshold_date')
+automation_df_sim = automation_df_sim[["measurement_item_id", "rate_mill_h", "threshold_date"]]
+df_sim_out = automation_df_sim.pivot(index='measurement_item_id', columns='rate_mill_h', values='threshold_date')
 df_sim_out.columns = np.array(["稼働率 "], dtype=object) + df_sim_out.columns.values.round(1).astype(str)
 
 df_out = pd.concat([automation_df, df_sim_out], axis=1, sort=False)
