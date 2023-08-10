@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from termcolor import colored
 from datetime import timedelta, datetime
-from numpy.core.umath_tests import inner1d
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from utills import get_threshold_value, input_df_wear, getCurrentSensorCount,df_wear_cleaning, \
@@ -317,12 +316,13 @@ def auto_test_df(df_wear):
 
     return auto_df
 
-automation_master_df = auto_test_df(df_wear=df_wear)
+automation_df = auto_test_df(df_wear=df_wear)
 # automation_master_df.to_csv("automation_master_df.csv")
 pid_id_list = pids
 
 asset_rmse =[]
 actual_date = []
+rm_days_sim = []
 rm_days_test = []
 total_hours_list = []
 remaining_hours_list = []
@@ -334,8 +334,8 @@ feature_GB['features'] = feature_GB['features'].apply(ast.literal_eval)
 
 for r in df_wear.measurement_item_id.unique():
     print("prediction of Longitude: ", colored(str(r), 'red', attrs=['bold']))
-    last_date = automation_master_df[automation_master_df["measurement_item_id"]==r].from_pred_date.to_list()[0]
-    actual_date.append(automation_master_df[automation_master_df["measurement_item_id"]==r].date_l.to_list()[0][-1])
+    last_date = automation_df[automation_df["measurement_item_id"]==r].from_pred_date.to_list()[0]
+    actual_date.append(automation_df[automation_df["measurement_item_id"]==r].date_l.to_list()[0][-1])
     print("last_date ##",last_date)
     dict_sensor_dfs = df_ai[last_date:]
     dict_sensor_dfs.dropna(inplace=True)
@@ -343,8 +343,8 @@ for r in df_wear.measurement_item_id.unique():
     
     # rate_mill_h = df_wear_test[df_wear_test['measurement_item_id'] ==r].rate_mill_h.values[0]
     rate_mill_h = df_wear[df_wear['measurement_item_id'] == r][df_wear['date'] == last_date]['rate_mill_h'].values[0]
-    threshold_wear = automation_master_df[automation_master_df["measurement_item_id"]==r].wear_l.to_list()[0][-1]
-    total_wear = automation_master_df[automation_master_df["measurement_item_id"]==r].total_wear.to_list()[0]
+    threshold_wear = automation_df[automation_df["measurement_item_id"]==r].wear_l.to_list()[0][-1]
+    total_wear = automation_df[automation_df["measurement_item_id"]==r].total_wear.to_list()[0]
     print("threshold_wear :", threshold_wear)
     print("total_wear :", total_wear)
     print("rate_mill_h: ", rate_mill_h)
@@ -378,6 +378,7 @@ for r in df_wear.measurement_item_id.unique():
     calc_wear = calc_wear.reshape(1)
     model_calc_rate = calc_wear[0]
     
+    rm_days_sim.extend(sim_days_calculate(threshold_wear, total_wear, model_calc_rate, rate_mill_h, utilization_dict[r]))
     r_days = (threshold_wear-total_wear)/model_calc_rate
     
     if r_days > 2190:
@@ -401,29 +402,51 @@ for r in df_wear.measurement_item_id.unique():
     total_hours_list.append(total_hours)
     remaining_hours_list.append(remaining_hours)
 
-automation_master_df['remain_d'] = rm_days_test
-automation_master_df['threshold_wear'] = threshold_wear_list
-automation_master_df["actual_date"] = actual_date
-automation_master_df.loc[:, "predicted_date"] = pd.to_datetime(automation_master_df["from_pred_date"]) + pd.to_timedelta(
-    automation_master_df.loc[:, "remain_d"].values, unit="D"
+automation_df['remain_d'] = rm_days_test
+automation_df['threshold_wear'] = threshold_wear_list
+automation_df["actual_date"] = actual_date
+automation_df.loc[:, "predicted_date"] = pd.to_datetime(automation_df["from_pred_date"]) + pd.to_timedelta(
+    automation_df.loc[:, "remain_d"].values, unit="D"
 )
-automation_master_df['actual_date'] = pd.to_datetime(automation_master_df['actual_date'])
-automation_master_df['predicted_date'] = pd.to_datetime(automation_master_df['predicted_date'])
+automation_df['actual_date'] = pd.to_datetime(automation_df['actual_date'])
+automation_df['predicted_date'] = pd.to_datetime(automation_df['predicted_date'])
 
-automation_master_df['diff_days'] = (automation_master_df['actual_date'] - automation_master_df['predicted_date']).dt.days
-automation_master_df['flag'] = automation_master_df['diff_days'].apply(lambda x: True if -365 <= x <= 1460 else False)
-automation_master_df.drop(['wear_l', 'date_l'], axis=1, inplace=True)
+automation_df['diff_days'] = (automation_df['actual_date'] - automation_df['predicted_date']).dt.days
+automation_df['flag'] = automation_df['diff_days'].apply(lambda x: True if -365 <= x <= 1460 else False)
+automation_df.drop(['wear_l', 'date_l'], axis=1, inplace=True)
 
-automation_master_df = automation_master_df[['measurement_item_id', 'from_pred_date', 
+automation_df = automation_df[['measurement_item_id', 'from_pred_date', 
                                              'total_wear', 'threshold_wear', 'actual_date', 
                                              'predicted_date', 'flag']]
+automation_df.set_index(['measurement_item_id'], inplace=True)
 
+df_wear_sim.loc[:, "remain_d"] = rm_days_sim
+df_wear_sim["remain_d"] = df_wear_sim.loc[:, "remain_d"].apply(lambda x: 25000 if x > 25000 else x)
+df_wear_sim.loc[:, "threshold_date"] = pd.to_datetime(df_wear_sim["date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
+    df_wear_sim.loc[:, "remain_d"].values, unit="D")
 
-true_count = automation_master_df['flag'].sum()
-total_count = len(automation_master_df)
+df_wear_sim.loc[:, "threshold_date"] = df_wear_sim.loc[:, "threshold_date"].dt.floor("D")
+
+df_wear_sim = df_wear_sim[["measurement_item_id", "rate_mill_h", "threshold_date"]]
+df_sim_out = df_wear_sim.pivot(index='measurement_item_id', columns='rate_mill_h', values='threshold_date')
+df_sim_out.columns = np.array(["稼働率 "], dtype=object) + df_sim_out.columns.values.round(1).astype(str)
+
+df_out = pd.concat([automation_df, df_sim_out], axis=1, sort=False)
+df_out.rename(columns={'predicted_date':'寿命到達日'}, inplace=True)
+hour_col = ["残時間"] + (df_sim_out.columns.values + np.array(" 残時間")).tolist()
+date_col = ["寿命到達日"] + df_sim_out.columns.values.tolist()
+date_now = pd.Timestamp.now()
+
+df_out.loc[:, hour_col] = ((df_out[date_col] - date_now).values / pd.Timedelta(1, "h")).round()
+df_out.reset_index(inplace=True)
+df_out = relation.merge(df_out, on='measurement_item_id', how='left')
+
+true_count = automation_df['flag'].sum()
+total_count = len(automation_df)
 successful_rate = true_count / total_count * 100  # Calculate the successful rate as a percentage
 
+print(df_out)
 print(f"Successful Rate of Model: {successful_rate:.2f}%")
 if not os.path.exists('./review'):
     os.mkdir('./review')
-automation_master_df.to_csv(f'review/{asset_id}_auto_predicted_test.csv', index=False)
+df_out.to_csv(f'review/{asset_id}_auto_predicted_test.csv', index=False, encoding='utf-8')
