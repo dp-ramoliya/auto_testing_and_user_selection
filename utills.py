@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from termcolor import colored
 from datetime import datetime, timedelta
 from numpy.core.umath_tests import inner1d
 
@@ -363,9 +364,6 @@ def sim_days_calculate(wear_threshold, total_wear, model_calc_rate, rate_mill_ho
     
     if initial_remaining_days > 2190:
         initial_remaining_days = 2190
-    
-    # if initial_remaining_days < -5475:
-    #     initial_remaining_days = -5475
 
     utilization_rates = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
@@ -392,6 +390,8 @@ def sim_days_calculate(wear_threshold, total_wear, model_calc_rate, rate_mill_ho
         remaining_days[i] = remaining_days[i]-(remaining_days[i]*propotion)
     print("remaining_days: ")
     print(remaining_days)
+    print("model_calc_rate: ", colored(str(model_calc_rate), 'green', attrs=['bold']))
+    print("model_calc_rate :", )
     return remaining_days
 
 #For Manual Prediction 
