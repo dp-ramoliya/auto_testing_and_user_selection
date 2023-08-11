@@ -365,6 +365,10 @@ for r in np.arange(0.1, 1.1, 0.1):
     automation_df_sim.append(df_append)
 automation_df_sim = pd.concat(automation_df_sim, axis=0)
 
+automation_df_sim.sort_values(
+    ["measurement_item_id", "from_pred_date"], inplace=True
+)
+
 automation_df['remain_d'] = rm_days_test
 automation_df['Utilization'] = est_current_operation_rate
 automation_df['threshold_wear'] = threshold_wear_list
@@ -380,12 +384,14 @@ automation_df['flag'] = automation_df['diff_days'].apply(lambda x: True if -365 
 automation_df.drop(['wear_l', 'date_l'], axis=1, inplace=True)
 
 automation_df = automation_df[['measurement_item_id', 'from_pred_date', 
-                               'total_wear', 'threshold_wear', 'Utilization', 'actual_date', 
-                                'predicted_date', 'flag']]
+                               'total_wear', 'threshold_wear', 'Utilization', 
+                               'actual_date', 'predicted_date', 'flag']]
 automation_df.set_index(['measurement_item_id'], inplace=True)
 
 automation_df_sim.loc[:, "remain_d"] = rm_days_sim
 automation_df_sim["remain_d"] = automation_df_sim.loc[:, "remain_d"].apply(lambda x: 9125 if x > 9125 else x)
+automation_df_sim.to_csv("automation_df_sim.csv")
+print(automation_df_sim[['from_pred_date', 'remain_d']])
 automation_df_sim.loc[:, "threshold_date"] = pd.to_datetime(automation_df_sim["from_pred_date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
     automation_df_sim.loc[:, "remain_d"].values, unit="D")
 
@@ -413,4 +419,4 @@ print(df_out)
 print(f"Successful Rate of Model: {successful_rate:.2f}%")
 if not os.path.exists('./review'):
     os.mkdir('./review')
-df_out.to_csv(f'review/{asset_id}_auto_predicted_test.csv', index=False, encoding='utf-8')
+df_out.to_csv(f'review/{asset_id}_auto_predicted_test_{datetime.now().strftime("%Y%m%d%H%M%S")}.csv', index=False, encoding='utf-8')

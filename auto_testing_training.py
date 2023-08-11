@@ -7,13 +7,13 @@ import pandas as pd
 from sklearn import metrics
 from termcolor import colored
 from sklearn.svm import LinearSVR
+from sklearn.pipeline import make_pipeline
 from tpot.builtins import StackingEstimator
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.feature_selection import SelectFromModel
-from sklearn.pipeline import make_pipeline
 from sklearn.feature_selection import SelectPercentile, f_regression
 from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 
