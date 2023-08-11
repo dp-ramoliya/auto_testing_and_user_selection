@@ -1,18 +1,18 @@
 import os
+import ast
 import json
 import joblib
-import ast
 import psycopg2
 import warnings
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from termcolor import colored
+from datetime import timedelta, datetime
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from utills import get_threshold_value, input_df_wear, getCurrentSensorCount,df_wear_cleaning, \
                    calc_rate, all_asset_pid, db_to_pandas, scale_mill, scale_mill_state, supply_current_convert, \
-                   estimate_operation_rate, sim_days_calculate
-
+                   estimate_operation_rate, sim_days_calculate, auto_test_df
 np.set_printoptions(precision=3, suppress=True)
 warnings.filterwarnings("ignore")
 
@@ -29,23 +29,23 @@ input_json = """{
 
 input_json = json.loads(input_json)
 asset_id = int(input_json['asset-id'])
-msumt_item_set_id = int(input_json['measurement-item-set-id'])
-
+print(asset_id, type(asset_id))
 cursor = conn.cursor()
-
-# Selecting Threshold Values from DB
 threshold_wear = get_threshold_value(conn, asset_id)
 
 # Selecting the data from DB for the asset_id
 df_wear, relation = input_df_wear(asset_id, conn)
-print("df_wear created.")
+print("df_wear after concat", df_wear)
 
 highest_date_row = df_wear.sort_values(by='date').iloc[-1]
 highest_date = str(highest_date_row['date'])
 highest_hours = highest_date_row['hours']
 
+print("highest_date: ", highest_date)
+print("highest_hours: ", highest_hours)
 current_sensor_count = getCurrentSensorCount(conn, asset_id, highest_date)
 print("current_sensor_count: ", current_sensor_count)
+
 # clean the df_wear and remove hours = 1 records, negative value records and wear = 0 records
 df_wear = df_wear_cleaning(df_wear)
 
@@ -59,7 +59,7 @@ with pd.option_context("mode.use_inf_as_na", True):
     ] = np.nan
     df_wear["finite_rate_mill_h"] = df_wear["rate_mill_h"].notna().astype(float)
     df_wear["rate_mill_h"].fillna(-9999, inplace=True)
-    #df_wear["rate_mill_h"].fillna(0, inplace=True)
+    # df_wear["rate_mill_h"].fillna(0, inplace=True)
     df_wear["finite_rate_mill_h"].value_counts()
 
 # Fetching pid relation from database to dataframe
@@ -99,11 +99,10 @@ df_wear["wear_start"] = df_wear["wear"] - df_wear["wear_diff"]
 df_wear["start_index"] = df_ai.index.get_indexer(df_wear["date_start"].values) + 1
 df_wear["end_index"] = df_ai.index.get_indexer(df_wear["date"].values) + 1
 
-
 df_wear["rate_mill_h"].fillna(value= 0, inplace=True)
-# Train-test split
 
 df_wear_train = df_wear.copy()
+
 df_wear_test = []
 for i, df in df_wear.groupby(["measurement_item_id"]):
     df_wear_test.append(df.loc[df["date"] == df["date"].max(), :].copy())
@@ -111,14 +110,12 @@ for i, df in df_wear.groupby(["measurement_item_id"]):
 df_wear_test = pd.concat(df_wear_test)
 df_wear_test.loc[:, "end_index"] = len(df_ai)
 
-# prepare simulation data frame now
 df_wear_sim = []
 for r in np.arange(0.1, 1.1, 0.1):
     df_append = df_wear_test.copy()
     df_append["rate_mill_h"] = r
     df_append["finite_rate_mill_h"] = 1.0
     df_wear_sim.append(df_append)
-
 df_wear_sim = pd.concat(df_wear_sim, axis=0)
 
 # calculate utilization part
@@ -140,7 +137,7 @@ scaler = StandardScaler()
 state_std = scale_mill_state(vnames_std, df_ai, scaler)
 state_std_notna = (~np.isnan(state_std)).astype(float)
 np.nan_to_num(state_std, copy=False, nan=-9999)
-# np.nan_to_num(state_std, copy=False, nan=0.0)
+#np.nan_to_num(state_std, copy=False, nan=0.0)
 
 # データ整形
 df_wear_train.sort_values(
@@ -172,26 +169,27 @@ data = dict(
     # number of position
     P=5,
     # start and end of wear data for each position
-    #i_pos=pos_train,
+    # i_pos=pos_train,
+    wear_threshold=65,
     wear_target=df_wear_train["wear"].values,
     # 1 wear_raw, 2 operation rate, 3 finite flag of operation rate
     wear=df_wear_train.loc[
         :, ["wear", "rate_mill_h", "finite_rate_mill_h"]
     ].values,
-    #mill=df_wear_train["mill_index"].values,
+    # mill=df_wear_train["mill_index"].values,
     mill=0,
     t=df_wear_train[["start_index", "end_index"]].values,
-    #i_pos_test=pos_test,
+    # i_pos_test=pos_test,
     # for RUL prediction, input should be "wear" instead of "wear_start"
     wear_test=df_wear_test.loc[:, ["wear", "rate_mill_h", "finite_rate_mill_h"]].values,
     mill_test=0,
-    #mill_test=df_wear_test["mill_index"].values,
+    # mill_test=df_wear_test["mill_index"].values,
     t_test=df_wear_test[["start_index", "end_index"]].values,
-    #i_pos_sim=pos_sim,
+    # i_pos_sim=pos_sim,
     # for RUL prediction, input should be "wear" instead of "wear_start"
     wear_sim=df_wear_sim.loc[:, ["wear", "rate_mill_h", "finite_rate_mill_h"]].values,
     mill_sim=0,
-    #mill_sim=df_wear_sim["mill_index"].values,
+    # mill_sim=df_wear_sim["mill_index"].values,
     t_sim=df_wear_sim[["start_index", "end_index"]].values,
 )
 
@@ -242,8 +240,7 @@ for v in range(0, (V_std - 2)):
         term_supply_sim[:, v] *= term_supply_sim_na[:, v]
     else:
         term_supply_sim[:, v] = np.full(N_test,0)
-
-print("normalization of term supply completed.")
+print("normalization of term supply completed")
 
 for v in range(2):
     N_v = sum(term_current_na[:, v])
@@ -266,34 +263,49 @@ for v in range(2):
         term_current_sim[:, v] = np.full(N_sim,0)
 
 print("normalization of term current completed")
-
 # Finding Slop and intercept
 est_current_operation_rate = estimate_operation_rate(data["wear"], supply_test, N_tp_test, supply_rate)
 df_wear_test.loc[:, "Utilization"] = abs(est_current_operation_rate)
 utilization_dict = dict(zip(df_wear_test.measurement_item_id, df_wear_test.Utilization))
 
-# Prediction for test dataframe
-print("Prediction srarted for test dataframe")
+data_unit = 4
+# df_rmse = pd.read_csv('rmse/{}_master_rmse.csv'.format(data_unit))
 
-rm_days_test = []
+automation_df = auto_test_df(df_wear=df_wear, YEAR=3)
+# automation_df.to_csv("automation_master_df.csv")
+pid_id_list = pids
+
+asset_rmse =[]
+actual_date = []
 rm_days_sim = []
+rm_days_test = []
 total_hours_list = []
+threshold_wear_list = []
+remaining_hours_list = []
 
 feature_GB = pd.read_csv("data/features_GB.csv")
 feature_GB = feature_GB[feature_GB['asset_id'] == asset_id]
 feature_GB['features'] = feature_GB['features'].apply(ast.literal_eval)
 
 for r in df_wear.measurement_item_id.unique():
-    last_date = df_wear.loc[(df_wear['measurement_item_id'] == r),['date']].max().values
-    
-    dict_sensor_dfs = df_ai[last_date[0]:]
+    print("prediction of Longitude: ", colored(str(r), 'red', attrs=['bold']))
+    last_date = automation_df[automation_df["measurement_item_id"]==r].from_pred_date.to_list()[0]
+    actual_date.append(automation_df[automation_df["measurement_item_id"]==r].date_l.to_list()[0][-1])
+    print("last_date ##",last_date)
+    dict_sensor_dfs = df_ai[last_date:]
     dict_sensor_dfs.dropna(inplace=True)
     model_loop = joblib.load(open('auto_training/model_{}.pkl'.format(r),'rb'))
     
-    print("Prediction start of Longitude : ", r)
-    rate_mill_h = df_wear_test[df_wear_test['measurement_item_id'] ==r].rate_mill_h.values[0]
-    total_wear = df_wear_test[df_wear_test['measurement_item_id']==r].wear.values[0]
-
+    # rate_mill_h = df_wear_test[df_wear_test['measurement_item_id'] ==r].rate_mill_h.values[0]
+    rate_mill_h = df_wear[df_wear['measurement_item_id'] == r][df_wear['date'] == last_date]['rate_mill_h'].values[0]
+    threshold_wear = automation_df[automation_df["measurement_item_id"]==r].wear_l.to_list()[0][-1]
+    total_wear = automation_df[automation_df["measurement_item_id"]==r].total_wear.to_list()[0]
+    print("threshold_wear :", threshold_wear)
+    print("total_wear :", total_wear)
+    print("rate_mill_h: ", rate_mill_h)
+    threshold_wear_list.append(threshold_wear)
+    hours = df_wear_test[df_wear_test['measurement_item_id']==r].hours.values[0]
+    
     supply = dict_sensor_dfs[df_pids.loc['supply', 't_pid_no_text']].mean()
     current = dict_sensor_dfs[df_pids.loc['current', 't_pid_no_text']].mean()
     HGI = dict_sensor_dfs[df_pids.loc['HGI', 't_pid_no_text']].mean()
@@ -319,19 +331,18 @@ for r in df_wear.measurement_item_id.unique():
     calc_wear = model_loop.predict([f_list])
     calc_wear = calc_wear.reshape(1)
     model_calc_rate = calc_wear[0]
-
+    
     rm_days_sim.extend(sim_days_calculate(threshold_wear, total_wear, model_calc_rate, rate_mill_h, utilization_dict[r]))
-
     r_days = (threshold_wear-total_wear)/model_calc_rate
     
-    if r_days > 5475:
-        r_days = 5475
+    if r_days > 2190:
+        r_days = 2190
 
     rm_days_test.append(int(r_days))
     remaining_hours = int(r_days)*24
 
     today_date = datetime.now()
-    date_1 = pd.to_datetime(last_date[0])
+    date_1 = pd.to_datetime(last_date)
     
     end_date = date_1 + timedelta(days=int(r_days))
     
@@ -341,98 +352,69 @@ for r in df_wear.measurement_item_id.unique():
     else:
         predict_hours = (end_date - today_date)/ pd.Timedelta(hours=1)
         total_hours =  highest_hours  + current_sensor_count + int(predict_hours)
-
+        
     total_hours_list.append(total_hours)
-    print("Prediction end of Longitude : ", r)
+    remaining_hours_list.append(remaining_hours)
 
+automation_df_sim = []
+for r in np.arange(0.1, 1.1, 0.1):
+    df_append = automation_df.copy()
+    df_append["rate_mill_h"] = r
+    df_append["finite_rate_mill_h"] = 1.0
+    automation_df_sim.append(df_append)
+automation_df_sim = pd.concat(automation_df_sim, axis=0)
 
-print("Threshold Date Generates for All Roller.")
-
-df_wear_test.loc[:, "remain_d"] = rm_days_test
-df_wear_test.loc[:, "Asset_id"] = asset_id
-df_wear_test.loc[:, "Total_Hours"] = total_hours_list
-df_wear_test.loc[:, "threshold_date"] = pd.to_datetime(df_wear_test["date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
-    df_wear_test.loc[:, "remain_d"].values, unit="D"
+automation_df_sim.sort_values(
+    ["measurement_item_id", "from_pred_date"], inplace=True
 )
-df_wear_test.loc[:, "threshold_date"] = df_wear_test.loc[:, "threshold_date"].dt.floor("D")
 
-#, errors='coerce', format='%Y-%m-%d'
-df_wear_sim.loc[:, "remain_d"] = rm_days_sim
-df_wear_sim["remain_d"] = df_wear_sim.loc[:, "remain_d"].apply(lambda x: 25000 if x > 25000 else x)
-df_wear_sim.loc[:, "threshold_date"] = pd.to_datetime(df_wear_sim["date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
-    df_wear_sim.loc[:, "remain_d"].values, unit="D"
-    )
-df_wear_sim.loc[:, "threshold_date"] = df_wear_sim.loc[:, "threshold_date"].dt.floor("D")
+automation_df['remain_d'] = rm_days_test
+automation_df['Utilization'] = est_current_operation_rate
+automation_df['threshold_wear'] = threshold_wear_list
+automation_df["actual_date"] = actual_date
+automation_df.loc[:, "predicted_date"] = pd.to_datetime(automation_df["from_pred_date"]) + pd.to_timedelta(
+    automation_df.loc[:, "remain_d"].values, unit="D"
+)
+automation_df['actual_date'] = pd.to_datetime(automation_df['actual_date'])
+automation_df['predicted_date'] = pd.to_datetime(automation_df['predicted_date'])
 
+automation_df['diff_days'] = (automation_df['actual_date'] - automation_df['predicted_date']).dt.days
+automation_df['flag'] = automation_df['diff_days'].apply(lambda x: True if -365 <= x <= 1460 else False)
+automation_df.drop(['wear_l', 'date_l'], axis=1, inplace=True)
 
-df_test_out = df_wear_test[["measurement_item_id", "Utilization", "threshold_date", "Total_Hours"]]
-df_wear_sim = df_wear_sim[["measurement_item_id","rate_mill_h", "threshold_date"]]
+automation_df = automation_df[['measurement_item_id', 'from_pred_date', 
+                               'total_wear', 'threshold_wear', 'Utilization', 
+                               'actual_date', 'predicted_date', 'flag']]
+automation_df.set_index(['measurement_item_id'], inplace=True)
 
-df_sim_out = df_wear_sim.pivot(index='measurement_item_id', columns='rate_mill_h', values='threshold_date')
+automation_df_sim.loc[:, "remain_d"] = rm_days_sim
+automation_df_sim["remain_d"] = automation_df_sim.loc[:, "remain_d"].apply(lambda x: 9125 if x > 9125 else x)
+
+automation_df_sim.loc[:, "threshold_date"] = pd.to_datetime(automation_df_sim["from_pred_date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
+    automation_df_sim.loc[:, "remain_d"].values, unit="D")
+
+automation_df_sim.loc[:, "threshold_date"] = automation_df_sim.loc[:, "threshold_date"].dt.floor("D")
+
+automation_df_sim = automation_df_sim[["measurement_item_id", "rate_mill_h", "threshold_date"]]
+df_sim_out = automation_df_sim.pivot(index='measurement_item_id', columns='rate_mill_h', values='threshold_date')
 df_sim_out.columns = np.array(["稼働率 "], dtype=object) + df_sim_out.columns.values.round(1).astype(str)
-df_test_out.set_index(['measurement_item_id'], inplace=True)
 
-df_out = pd.concat([df_test_out, df_sim_out], axis=1, sort=False)
-
-df_out.rename(columns={'threshold_date':'寿命到達日'}, inplace=True)
-
+df_out = pd.concat([automation_df, df_sim_out], axis=1, sort=False)
+df_out.rename(columns={'predicted_date':'寿命到達日'}, inplace=True)
 hour_col = ["残時間"] + (df_sim_out.columns.values + np.array(" 残時間")).tolist()
 date_col = ["寿命到達日"] + df_sim_out.columns.values.tolist()
-
 date_now = pd.Timestamp.now()
+
 df_out.loc[:, hour_col] = ((df_out[date_col] - date_now).values / pd.Timedelta(1, "h")).round()
 df_out.reset_index(inplace=True)
 df_out = relation.merge(df_out, on='measurement_item_id', how='left')
-df_out.rename(columns={'threshold_date':'寿命到達日',
-            'longitude': '軸方向位置',
-            'Utilization':'推定稼働率',
-            'Total_Hours':'合計時間'}, inplace=True)
 
-df_out = df_out[[
-    'asset_id', 'measurement_item_id', '軸方向位置', '推定稼働率', '寿命到達日', '合計時間', 
-    '稼働率 0.1', '稼働率 0.2', '稼働率 0.3', '稼働率 0.4', '稼働率 0.5','稼働率 0.6', 
-    '稼働率 0.7', '稼働率 0.8', '稼働率 0.9', '稼働率 1.0', '残時間', '稼働率 0.1 残時間',
-    '稼働率 0.2 残時間', '稼働率 0.3 残時間', '稼働率 0.4 残時間', '稼働率 0.5 残時間', 
-    '稼働率 0.6 残時間', '稼働率 0.7 残時間', '稼働率 0.8 残時間', '稼働率 0.9 残時間', '稼働率 1.0 残時間'
-    ]]
-# last_input = df_ai.index.max()
+true_count = automation_df['flag'].sum()
+total_count = len(automation_df)
+successful_rate = true_count / total_count * 100  # Calculate the successful rate as a percentage
 
-try:
-    select_last_date_train = """SELECT created_date, model_rmse, avg_rmse FROM t_model_setsubi_training_data_check
-                                WHERE asset_id = '{}' ORDER BY created_date DESC LIMIT 1""".format(asset_id)
-
-    cursor.execute(select_last_date_train)
-    db_value = cursor.fetchall()[0]
-    last_date_train = db_value[0]
-    last_date_train = last_date_train.strftime("%Y-%m-%d %H:%M:%S")
-    rmse = db_value[1]
-    rmse_operation = db_value[2]
-
-
-except Exception as e:
-    print(e)
-    print("Error While Selecting Last Date Train")
-    last_date_train = "Not Found"
-    rmse = "Not Found"
-    rmse_operation = "Not Found"
-
-
-setting = [
-    "# asset-id :{}".format(asset_id),
-    "# measurement-item-set-id : {}".format(msumt_item_set_id),
-    "# Last-train-date : {}".format(last_date_train),
-    "# 摩耗推定の平均二乗誤差平方根(RMSE mm), {}, 20 mm を超える場合は、余寿命予測の信頼性に注意が必要です。".format(rmse),
-    "# 稼働率推定の平均二乗誤差平方根(RMSE), {}, 0.01を超える場合は、余寿命予測の信頼性に注意が必要です。\n".format(rmse_operation),
-]
-
-fn_out_local = "output/u{}_{}.csv".format(
-    str(asset_id), datetime.now().strftime("%Y%m%d%H%M%S")
-)
-if not os.path.exists('./output'):
-    os.mkdir('./output')
-
-with open(fn_out_local, mode="w", encoding="utf-8-sig") as f:
-    f.writelines("\n".join(setting))
-    df_out.to_csv(f, index=False, mode="a")
-
-conn.close()  # close connection
+print(df_out)
+print(f"Successful Rate of Model: {successful_rate:.2f}%")
+if not os.path.exists('./review'):
+    os.mkdir('./review')
+df_out.to_csv(f'review/{asset_id}_auto_predicted_test_{datetime.now().strftime("%Y%m%d%H%M%S")}.csv', index=False, encoding='utf-8')
