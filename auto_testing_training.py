@@ -208,4 +208,4 @@ for m in all_asset_id:
 
 if not os.path.exists('./data'):
     os.mkdir('./data')
-df_feature_GB.to_csv("data/features_GB_1.csv", index=False)
+df_feature_GB.to_csv("data/features_GB.csv", index=False)
