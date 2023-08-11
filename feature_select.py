@@ -1,5 +1,5 @@
 import ast
-import pandas as pd
+from termcolor import colored
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_selection import SelectKBest, f_regression
 
@@ -23,20 +23,26 @@ def feature_select_GB(X, y, asset_id, msumt_id, pids_and_name):
     for feature, importance in sorted_gb_feature_importance:
         try:
             if pids_and_name.get(feature):
-                print(f"{feature} ({pids_and_name[feature]}): {importance}")
+                print(colored(f"{feature} ({pids_and_name[feature]}): ", 'blue'), colored(f"{importance}", 'green', attrs=['bold']))
+                # print(f"{feature} ({pids_and_name[feature]}): {importance}")
             else:
                 print(f"{feature} : {importance}")
 
-        except:
+        except Exception as e:
             print("error while selecting feature.")
-            
+
         feature_l.append(feature)
 
     print("feature list: ", feature_l)
+    print(colored("Write Stop to 'stop' feature selection.", 'red', attrs=['bold']))
     user_sensor_index = input("Enter sensor index From above list to select Feature :")
+
+    if user_sensor_index == 'stop':
+        return False
+    
     user_sensor_index_list = [int(i) for i in user_sensor_index]
-    user_sensor_list = [feature_l[i] for i in user_sensor_index_list]
-    return user_sensor_list
+    
+    return [feature_l[i] for i in user_sensor_index_list]
 
 def feature_select_regression(X, y):
 

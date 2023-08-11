@@ -144,7 +144,7 @@ mdf = mdf[mdf['unit'] == data_unit]
 df_feature_GB = pd.DataFrame(columns=['asset_id', 'msumt_id', 'features'])
 
 """Generating Pickle file for All Asset ID"""
-
+break_outer_loop = False
 for m in all_asset_id:
     print("Training of Mill/Asset Started ", m)
     df_wear_asset = df_wear[df_wear["asset_id"]==m]
@@ -179,10 +179,14 @@ for m in all_asset_id:
         X_temp = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
         x_column = feature_select_GB(X=X_temp, y=y, asset_id=m, msumt_id=r, pids_and_name=pids_and_name)
+
+        if x_column == False:
+            break_outer_loop = True
+            break
+
         df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column] 
         
         X = sensor_data_with_wear[x_column]
-        print(X)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1)
         
         mlr_loop = model_pipe_dict[r].fit(X_train, y_train)
@@ -198,7 +202,10 @@ for m in all_asset_id:
         joblib.dump(mlr_loop, 'auto_training/model_{}.pkl'.format(r))
 
         print('rootMeanSqErr_of_{}_{} : {}'.format(data_unit, r, rootMeanSqErr))
+    
+    if break_outer_loop:
+        break
 
 if not os.path.exists('./data'):
     os.mkdir('./data')
-df_feature_GB.to_csv("data/features_GB.csv", index=False)
+df_feature_GB.to_csv("data/features_GB_1.csv", index=False)
