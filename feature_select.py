@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.feature_selection import SelectKBest, f_regression
 
-def feature_select_GB(X, y, asset_id, msumt_id):
+def feature_select_GB(X, y, asset_id, msumt_id, pids_and_name):
     """
     Returns the List of Features
 
@@ -21,7 +21,15 @@ def feature_select_GB(X, y, asset_id, msumt_id):
 
     feature_l = []
     for feature, importance in sorted_gb_feature_importance:
-        print(f"{feature}: {importance}")
+        try:
+            if pids_and_name.get(feature):
+                print(f"{feature} ({pids_and_name[feature]}): {importance}")
+            else:
+                print(f"{feature} : {importance}")
+
+        except:
+            print("error while selecting feature.")
+            
         feature_l.append(feature)
 
     print("feature list: ", feature_l)

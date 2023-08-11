@@ -81,6 +81,7 @@ with pd.option_context("mode.use_inf_as_na", True):
     df_wear["finite_rate_mill_h"].value_counts()
     
 df_asset_pid = all_asset_pid(all_asset_id, conn)
+pids_and_name = {i:j for i,j in zip(df_asset_pid['t_pid_no_text'].values, df_asset_pid['sensor_name'].values)}
 df_asset_pid.set_index('sensor_name', inplace=True)
 
 pids = tuple(df_asset_pid['t_pid_no_text'].values)
@@ -177,7 +178,7 @@ for m in all_asset_id:
         # Splitting the dataset into the Training set and Test set
         X_temp = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
-        x_column = feature_select_GB(X_temp, y, asset_id=m, msumt_id=r)
+        x_column = feature_select_GB(X=X_temp, y=y, asset_id=m, msumt_id=r, pids_and_name=pids_and_name)
         df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column] 
         
         X = sensor_data_with_wear[x_column]
