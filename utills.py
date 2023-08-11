@@ -21,7 +21,7 @@ def db_to_pandas(client, MEASUREMENT, tag_all):
             "pid": tag
         }
     )
-    print(sql_query)
+    
     try:
         cursor = client.cursor()
         cursor.execute(sql_query)
@@ -48,7 +48,6 @@ def db_to_pandas(client, MEASUREMENT, tag_all):
     res_df = pd.pivot_table(res_df, index="time", columns=res_df.pid_no, values="last")
 
     return res_df
-
 
 def get_threshold_value(conn, asset_id):
     """
@@ -116,8 +115,6 @@ def input_df_wear(one_asset_id, conn):
     relation = pd.read_sql_query(item_id_relation, conn)
     record_set_id = tuple([i[0] for i in measurement_record_set_id])
 
-    print("record_set_id :", record_set_id)
-
     if not record_set_id:
         return
 
@@ -127,8 +124,6 @@ def input_df_wear(one_asset_id, conn):
 
     relation_measurement_item_id = relation['measurement_item_id'].to_list()
     relation_measurement_item_id.insert(0, 0)
-
-    print("relation_measurement_item_id", relation_measurement_item_id)
 
     df_loop = df_input[df_input['measurement_item_id'].isin(relation_measurement_item_id)]
 
@@ -201,7 +196,6 @@ def all_asset_pid(asset_id, conn):
 
 def columns_dot_product(A, B):
     return inner1d(A.T, B.T)
-
 
 def supply_current_convert(N, mill, t, state_minmax, state_minmax_notna, state_std, state_std_notna, V_std):
     term_supply =[]
