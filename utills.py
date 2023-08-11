@@ -371,9 +371,8 @@ def sim_days_calculate(wear_threshold, total_wear, model_calc_rate, rate_mill_ho
     for rate in utilization_rates:
         adjusted_rate_mill_hours = rate * rate_mill_hours
         adjusted_remaining_days = initial_remaining_days * ((rate_mill_hours / adjusted_rate_mill_hours) - utilization_val_mean*rate_mill_hours)
-        
         remaining_days.append(adjusted_remaining_days)
-    
+   
     utilization_val_mean_exact = int(str(int(utilization_val_mean*100))[0])/10
     predicted_index = np.array([round(i, 3) for i in np.abs(np.array(utilization_rates) - utilization_val_mean_exact)]).argmin()
     
@@ -382,16 +381,15 @@ def sim_days_calculate(wear_threshold, total_wear, model_calc_rate, rate_mill_ho
     
     #temp = int(str(int(utilization_val_mean*100))[1])/100
     temp = utilization_val_mean - utilization_val_mean_exact
-    
+    print("temp: ", colored(str(temp), 'green', attrs=['bold']))
     propotion = 1-(numerator/denominator)-temp
+    print("propotion: ", colored(str(propotion), 'green', attrs=['bold']))
     
-       
     for i in range(len(remaining_days)):
         remaining_days[i] = remaining_days[i]-(remaining_days[i]*propotion)
     print("remaining_days: ")
     print(remaining_days)
     print("model_calc_rate: ", colored(str(model_calc_rate), 'green', attrs=['bold']))
-    print("model_calc_rate :", )
     return remaining_days
 
 #For Manual Prediction 

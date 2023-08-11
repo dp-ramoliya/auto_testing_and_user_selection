@@ -43,7 +43,7 @@ highest_hours = highest_date_row['hours']
 
 print("highest_date: ", highest_date)
 print("highest_hours: ", highest_hours)
-current_sensor_count = getCurrentSensorCount(conn,asset_id,highest_date)
+current_sensor_count = getCurrentSensorCount(conn, asset_id, highest_date)
 print("current_sensor_count: ", current_sensor_count)
 
 # clean the df_wear and remove hours = 1 records, negative value records and wear = 0 records
@@ -272,7 +272,7 @@ data_unit = 4
 # df_rmse = pd.read_csv('rmse/{}_master_rmse.csv'.format(data_unit))
 
 automation_df = auto_test_df(df_wear=df_wear, YEAR=3)
-# automation_master_df.to_csv("automation_master_df.csv")
+# automation_df.to_csv("automation_master_df.csv")
 pid_id_list = pids
 
 asset_rmse =[]
@@ -390,8 +390,7 @@ automation_df.set_index(['measurement_item_id'], inplace=True)
 
 automation_df_sim.loc[:, "remain_d"] = rm_days_sim
 automation_df_sim["remain_d"] = automation_df_sim.loc[:, "remain_d"].apply(lambda x: 9125 if x > 9125 else x)
-automation_df_sim.to_csv("automation_df_sim.csv")
-print(automation_df_sim[['from_pred_date', 'remain_d']])
+
 automation_df_sim.loc[:, "threshold_date"] = pd.to_datetime(automation_df_sim["from_pred_date"].dt.strftime('%Y-%m-%d')) + pd.to_timedelta(
     automation_df_sim.loc[:, "remain_d"].values, unit="D")
 
