@@ -48,7 +48,8 @@ conn = psycopg2.connect(
 
 # data unit value come from step function
 # now use static for testing
-data_unit = 4
+
+data_unit = 3
 cursor = conn.cursor()
 sql_all_asset = 'SELECT * FROM t_measurement_item_id_relation WHERE unit={}'.format(data_unit)
 asset_measurement_id_relation_df = pd.read_sql_query(sql_all_asset, conn)
