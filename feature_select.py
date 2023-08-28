@@ -34,7 +34,7 @@ def feature_select_GB(X, y, asset_id, msumt_id, pids_and_name):
         feature_l.append(feature)
 
     print("feature list: ", feature_l)
-    print(colored("Write Stop to 'stop' feature selection.", 'red', attrs=['bold']))
+    print(colored("Write 'stop' to Stop feature selection.", 'red', attrs=['bold']))
     user_sensor_index = input("Enter sensor index From above list to select Feature :")
 
     if user_sensor_index == 'stop':
