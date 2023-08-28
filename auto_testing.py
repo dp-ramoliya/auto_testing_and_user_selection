@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 conn = psycopg2.connect(
    database="regression", user='postgres', password='root', host='127.0.0.1', port= '5432'
 )
-
+data_unit = 4
 input_json = """{
     "asset-id": 8995,
     "measurement-item-set-id": 1123,
@@ -283,7 +283,7 @@ total_hours_list = []
 threshold_wear_list = []
 remaining_hours_list = []
 
-feature_GB = pd.read_csv("data/features_GB.csv")
+feature_GB = pd.read_csv(f"data/features_GB_{data_unit}.csv")
 feature_GB = feature_GB[feature_GB['asset_id'] == asset_id]
 feature_GB['features'] = feature_GB['features'].apply(ast.literal_eval)
 
