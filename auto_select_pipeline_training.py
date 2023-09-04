@@ -4,18 +4,19 @@ import warnings
 import psycopg2
 import numpy as np
 import pandas as pd
-from sklearn import metrics
+from math import sqrt
 from termcolor import colored
 from sklearn.svm import LinearSVR
 from sklearn.pipeline import make_pipeline
 from tpot.builtins import StackingEstimator
+from sklearn.metrics import mean_squared_error
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.feature_selection import SelectFromModel
+from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.feature_selection import SelectPercentile, f_regression
-from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor, GradientBoostingRegressor
 
 from utills import db_to_pandas, input_df_wear, calc_rate
 from feature_select import feature_select_GB, feature_select_regression
@@ -144,6 +145,9 @@ mdf = mdf[mdf['unit'] == data_unit]
 
 df_feature_GB = pd.DataFrame(columns=['asset_id', 'msumt_id', 'features'])
 
+master_feature = {}
+master_rmse = {}
+
 """Generating Pickle file for All Asset ID"""
 break_outer_loop = False
 for m in all_asset_id:
@@ -177,36 +181,87 @@ for m in all_asset_id:
         sensor_data_with_wear.replace(to_replace = -9999, value = 0, inplace=True)
         
         # Splitting the dataset into the Training set and Test set
-        X_temp = sensor_data_with_wear.iloc[:,:7]
+        X = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
-        x_column = feature_select_GB(X=X_temp, y=y, asset_id=m, msumt_id=r, pids_and_name=pids_and_name)
 
-        if x_column == False:
-            break_outer_loop = True
-            break
+        feature_selector = RandomForestRegressor(n_estimators=100)
+        feature_selector.fit(X, y)
+        important_features = X.columns[feature_selector.feature_importances_ > 0.05]
 
-        df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column] 
+        # L1 Regularization (Lasso) 
+        # feature_selector = SelectFromModel(Lasso(alpha=0.05)) 
+        # feature_selector.fit(X, y) 
+        # important_features = X.columns[feature_selector.get_support()]
+
+        print("important_features")
+        print(important_features)
+        master_feature[str(r)] = list(important_features)
+        feature_selected = df_asset_pid[df_asset_pid['t_pid_no_text'].isin(list(important_features))]
+        print("*"*50)
+        print(feature_selected)
+
+
+        models = [
+        ("randomforestregressor", RandomForestRegressor()),
+        ("gradientboostingregressor", GradientBoostingRegressor()),
+        ("extratreesregressor", ExtraTreesRegressor()),
+        # ("kneighborsregressor", KNeighborsRegressor()),
+        # ("decisiontreeregressor", DecisionTreeRegressor()),
+        ]
+
+        best_model = None
+        best_rmse = float("inf")
+
+        for model_name, model in models:
+            pipeline = make_pipeline(SelectFromModel(feature_selector), model)
+
+            # Hyperparameter optimization using GridSearchCV
+            # Hyperparameter optimization using GridSearchCV
+            param_grid = {
+                f"{model_name}__n_estimators": [100, 200, 300]
+            }
+
+            if model_name in [
+                "randomforestregressor",
+                "gradientboostingregressor",
+                "decisiontreeregressor",
+            ]:
+                param_grid[f"{model_name}__max_depth"] = [None, 5, 10]
+
+            grid_search = GridSearchCV(pipeline, param_grid, cv=5, scoring="neg_mean_squared_error")
+            grid_search.fit(X[important_features], y)
+
+            # Best model from grid search
+            current_model = grid_search.best_estimator_
+
+            # Model Evaluation
+            # Split the data into training and testing sets
+            X_train, X_test, y_train, y_test = train_test_split(X[important_features], y, test_size=0.2, random_state=42)
+
+            # Train the current model on the training set
+            current_model.fit(X_train, y_train)
+
+            # Use the current model to make predictions on the test set
+            y_pred = current_model.predict(X_test)
+
+            # Calculate the root mean squared error (RMSE)
+            current_rmse = sqrt(mean_squared_error(y_test, y_pred))
+
+            # Update the best model if the current model has a lower RMSE
+            if current_rmse < best_rmse:
+                best_model = current_model
+                best_rmse = current_rmse
+
+        master_rmse[str(r)] = best_rmse
+        model_rmse.append(best_rmse)
         
-        X = sensor_data_with_wear[x_column]
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1)
+        master_feature_df = pd.DataFrame(master_feature.items())
+        master_feature_df.to_csv('features/{}_master_feature.csv'.format(m), index=False)
         
-        mlr_loop = model_pipe_dict[r].fit(X_train, y_train)
-
-        y_pred= mlr_loop.predict(X_test)
-        model_actual.append(y_test.sum().values[0])
-        model_prediction.append(sum(y_pred))
-        rootMeanSqErr = np.sqrt(metrics.mean_squared_error(y_test, y_pred))
-        model_rmse.append(rootMeanSqErr)
+        joblib.dump(current_model, 'training/model_{}.pkl'.format(r))
         
-        if not os.path.exists('./auto_training'):
-            os.mkdir('./auto_training')
-        joblib.dump(mlr_loop, 'auto_training/model_{}.pkl'.format(r))
-
-        print('rootMeanSqErr_of_{}_{} : {}'.format(data_unit, r, rootMeanSqErr))
+        print("Best Model:", colored(best_model, 'green', attrs=['bold'] ))
+        print("Best RMSE:",colored(best_rmse, 'red', attrs=['bold']))
+        print('rootMeanSqErr_of_{}_{} : {}'.format(data_unit,r,best_rmse))
+        print("#"*50)
     
-    if break_outer_loop:
-        break
-
-if not os.path.exists('./data'):
-    os.mkdir('./data')
-df_feature_GB.to_csv(f"data/features_GB_{data_unit}.csv", index=False)
