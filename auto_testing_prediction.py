@@ -19,10 +19,10 @@ warnings.filterwarnings("ignore")
 conn = psycopg2.connect(
    database="regression", user='postgres', password='root', host='127.0.0.1', port= '5432'
 )
-data_unit = 4
+data_unit = 5
 input_json = """{
-    "asset-id": 8995,
-    "measurement-item-set-id": 1123,
+    "asset-id": 11609,
+    "measurement-item-set-id": 1111,
     "threshold": 65,
     "measurement-record-set-ids": []
 }"""

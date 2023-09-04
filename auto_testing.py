@@ -24,9 +24,12 @@ conn = psycopg2.connect(
     4th-Unit 8980/1123, 8995/1124, 9010/1125, 9025/1126, 9040/1127, 9055/1128
     5th-Unit 11609/1111, 11610/1112, 11611/1113, 11612/1114, 11613/1115, 11614/1116
 """
+# please edit it for unit wise testing 3/4/5
+data_unit = 3
+
 input_json = """{
-    "asset-id": 6462,
-    "measurement-item-set-id": 1117,
+    "asset-id": 6465,
+    "measurement-item-set-id": 1122,
     "threshold": 65,
     "measurement-record-set-ids": []
 }"""
@@ -272,7 +275,7 @@ est_current_operation_rate = estimate_operation_rate(data["wear"], supply_test, 
 df_wear_test.loc[:, "Utilization"] = abs(est_current_operation_rate)
 utilization_dict = dict(zip(df_wear_test.measurement_item_id, df_wear_test.Utilization))
 
-data_unit = 4
+
 # df_rmse = pd.read_csv('rmse/{}_master_rmse.csv'.format(data_unit))
 
 automation_df = auto_test_df(df_wear=df_wear, YEAR=3)
@@ -287,9 +290,13 @@ total_hours_list = []
 threshold_wear_list = []
 remaining_hours_list = []
 
-feature_GB = pd.read_csv("data/features_GB.csv")
+feature_GB = pd.read_csv(f"data/features_GB_{data_unit}.csv")
 feature_GB = feature_GB[feature_GB['asset_id'] == asset_id]
 feature_GB['features'] = feature_GB['features'].apply(ast.literal_eval)
+
+# feature_GB = pd.read_csv("data/features_GB.csv")
+# feature_GB = feature_GB[feature_GB['asset_id'] == asset_id]
+# feature_GB['features'] = feature_GB['features'].apply(ast.literal_eval)
 
 for r in df_wear.measurement_item_id.unique():
     print("prediction of Longitude: ", colored(str(r), 'red', attrs=['bold']))
@@ -383,7 +390,7 @@ automation_df['actual_date'] = pd.to_datetime(automation_df['actual_date'])
 automation_df['predicted_date'] = pd.to_datetime(automation_df['predicted_date'])
 
 automation_df['diff_days'] = (automation_df['actual_date'] - automation_df['predicted_date']).dt.days
-automation_df['flag'] = automation_df['diff_days'].apply(lambda x: True if -365 <= x <= 1460 else False)
+automation_df['flag'] = automation_df['diff_days'].apply(lambda x: True if -365 <= x <= 365 else False)
 automation_df.drop(['wear_l', 'date_l'], axis=1, inplace=True)
 
 automation_df = automation_df[['measurement_item_id', 'from_pred_date', 
@@ -418,7 +425,7 @@ total_count = len(automation_df)
 successful_rate = true_count / total_count * 100  # Calculate the successful rate as a percentage
 
 print(df_out)
-print(f"Successful Rate of Model: {successful_rate:.2f}%")
+print(f"Accuracy of Model: {successful_rate:.2f}%")
 if not os.path.exists('./review'):
     os.mkdir('./review')
 df_out.to_csv(f'review/{asset_id}_auto_predicted_test_{datetime.now().strftime("%Y%m%d%H%M%S")}.csv', index=False, encoding='utf-8')

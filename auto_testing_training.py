@@ -49,7 +49,7 @@ conn = psycopg2.connect(
 # data unit value come from step function
 # now use static for testing
 
-data_unit = 3
+data_unit = 4
 cursor = conn.cursor()
 sql_all_asset = 'SELECT * FROM t_measurement_item_id_relation WHERE unit={}'.format(data_unit)
 asset_measurement_id_relation_df = pd.read_sql_query(sql_all_asset, conn)
@@ -80,7 +80,9 @@ with pd.option_context("mode.use_inf_as_na", True):
     df_wear["rate_mill_h"].fillna(-9999, inplace=True)
     # df_wear["rate_mill_h"].fillna(0, inplace=True)
     df_wear["finite_rate_mill_h"].value_counts()
-    
+
+#df_wear.to_csv("df_wear.csv")
+
 df_asset_pid = all_asset_pid(all_asset_id, conn)
 pids_and_name = {i:j for i,j in zip(df_asset_pid['t_pid_no_text'].values, df_asset_pid['sensor_name'].values)}
 df_asset_pid.set_index('sensor_name', inplace=True)
@@ -146,7 +148,9 @@ df_feature_GB = pd.DataFrame(columns=['asset_id', 'msumt_id', 'features'])
 
 """Generating Pickle file for All Asset ID"""
 break_outer_loop = False
+
 for m in all_asset_id:
+    l_count=0
     print("Training of Mill/Asset Started ", m)
     df_wear_asset = df_wear[df_wear["asset_id"]==m]
     longitude = list(df_wear_asset['measurement_item_id'].unique())
@@ -179,12 +183,17 @@ for m in all_asset_id:
         # Splitting the dataset into the Training set and Test set
         X_temp = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
-        x_column = feature_select_GB(X=X_temp, y=y, asset_id=m, msumt_id=r, pids_and_name=pids_and_name)
+        if l_count==0:
+            x_column = feature_select_GB(X=X_temp, y=y, asset_id=m, msumt_id=r, pids_and_name=pids_and_name)
+            #df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column]
+            l_count=l_count+1
 
         if x_column == False:
             break_outer_loop = True
             break
-
+        #print("x_column:")
+        #print(x_column)
+        x_column[0]=str(data_unit)+"_"+str(r)+"_rate_mill_h"
         df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column] 
         
         X = sensor_data_with_wear[x_column]

@@ -581,7 +581,9 @@ def auto_test_df(df_wear, YEAR):
 
     for i,j in df_wear.groupby('measurement_item_id'):
         j['date'] = j['date'].dt.strftime('%Y-%m-%d')
+        #print(j['date'])
         date_of_replace = j[j['wear']==0].date.values
+        #print("date_of_replace: ", date_of_replace)
         filtered_df = j[(j['date'] > date_of_replace[-2]) & (j['date'] < date_of_replace[-1])]
         print(i, filtered_df.date.values)
         msumt_id.append(i)
