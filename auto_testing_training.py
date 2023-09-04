@@ -179,13 +179,19 @@ for m in all_asset_id:
         # Splitting the dataset into the Training set and Test set
         X_temp = sensor_data_with_wear.iloc[:,:7]
         y = sensor_data_with_wear.iloc[:,-1:]
-        x_column = feature_select_GB(X=X_temp, y=y, asset_id=m, msumt_id=r, pids_and_name=pids_and_name)
+        
+        if df_feature_GB[df_feature_GB['asset_id']==m].empty:
+            x_column = feature_select_GB(X=X_temp, y=y, asset_id=m, msumt_id=r, pids_and_name=pids_and_name)
+        else:
+            fe_t = df_feature_GB[df_feature_GB['asset_id'] == m].features.values[0].copy()
+            fe_t[0] = f"{data_unit}_{r}_rate_mill_h"
+            x_column = fe_t
 
         if x_column == False:
             break_outer_loop = True
             break
-
-        df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column] 
+        
+        df_feature_GB.loc[len(df_feature_GB.index)] = [m, r, x_column]
         
         X = sensor_data_with_wear[x_column]
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1)
