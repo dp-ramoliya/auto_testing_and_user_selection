@@ -582,7 +582,13 @@ def auto_test_df(df_wear, YEAR):
     for i,j in df_wear.groupby('measurement_item_id'):
         j['date'] = j['date'].dt.strftime('%Y-%m-%d')
         date_of_replace = j[j['wear']==0].date.values
-        filtered_df = j[(j['date'] > date_of_replace[-2]) & (j['date'] < date_of_replace[-1])]
+        print("---",date_of_replace)
+        try:
+            filtered_df = j[(j['date'] > date_of_replace[-2]) & (j['date'] < date_of_replace[-1])]
+        except Exception as e:
+            print(e)
+            print("Last Date Not Found.")
+            raise
         print(i, filtered_df.date.values)
         msumt_id.append(i)
         date_l.append(filtered_df.date.to_list())
