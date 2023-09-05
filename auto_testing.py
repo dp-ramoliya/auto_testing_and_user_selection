@@ -276,7 +276,7 @@ utilization_dict = dict(zip(df_wear_test.measurement_item_id, df_wear_test.Utili
 # data_unit = 4
 # df_rmse = pd.read_csv('rmse/{}_master_rmse.csv'.format(data_unit))
 
-automation_df = auto_test_df(df_wear=df_wear, YEAR=3)
+automation_df = auto_test_df(asset_id=asset_id, df_wear=df_wear, YEAR=3)
 # automation_df.to_csv("automation_master_df.csv")
 pid_id_list = pids
 

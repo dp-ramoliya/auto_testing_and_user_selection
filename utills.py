@@ -566,7 +566,7 @@ def find_wear(lst_d, lst_w, p_date):
         if i == p_date:
             return j
 
-def auto_test_df(df_wear, YEAR):
+def auto_test_df(asset_id, df_wear, YEAR):
     """
     Returns the dataframe of last date and last wear from last Maintanace and 
     the actual date that roller changed and wear of that time(Threshold wear).
@@ -584,7 +584,13 @@ def auto_test_df(df_wear, YEAR):
         date_of_replace = j[j['wear']==0].date.values
         print("---",date_of_replace)
         try:
-            filtered_df = j[(j['date'] > date_of_replace[-2]) & (j['date'] < date_of_replace[-1])]
+            # This condition is for asset-id 11609 only because of the data issue 
+            # remove after it resolve.
+            if asset_id==11609:
+                filtered_df = j[(j['date'] > '2003-05-19') & (j['date'] < '2014-11-13')]
+            else:
+                filtered_df = j[(j['date'] > date_of_replace[-2]) & (j['date'] < date_of_replace[-1])]
+
         except Exception as e:
             print(e)
             print("Last Date Not Found.")
