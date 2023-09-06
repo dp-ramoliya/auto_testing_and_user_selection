@@ -62,7 +62,7 @@ for i in all_asset_id:
         all_input.append(out_wear)
     except Exception as e:
         print(e)
-        print("Error in input_df_wear function for asset_id: {}".format(i))  
+        print(f"Error in input_df_wear function for asset_id: {i}")
 
 df_wear = pd.concat(all_input, ignore_index=True)
 
